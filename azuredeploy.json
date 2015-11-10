@@ -5,6 +5,8 @@
         "storageAccountName": {
             "type": "string",
             "defaultValue": "MyARMDemo",
+            "minLength": 3,
+            "maxLength": 24,
             "metadata": {
                 "description": "Unique name for the storage account."
             }
@@ -25,6 +27,14 @@
         }
     },
     "resources": [
-        
+        {
+            "name": "[parameters('storageAccountName')]",
+            "type": "Microsoft.Storage/storageAccounts",
+            "location": "[ResourceGroup().Location]",
+            "apiVersion": "2015-05-01-preview",
+            "properties": {
+                "accountType": "[parameters('storageAccountType')]"
+            }
+        }        
     ]
 }
