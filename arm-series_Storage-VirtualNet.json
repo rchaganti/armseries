@@ -1,0 +1,75 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "storageAccountName": {
+            "type": "string",
+            "defaultValue": "MyARMDemo",
+            "minLength": 3,
+            "maxLength": 24,
+            "metadata": {
+                "description": "Unique name for the storage account."
+            }
+        },
+        "storageAccountType": {
+            "type": "string",
+            "defaultValue": "Standard_LRS",
+            "allowedValues": [
+                "Standard_LRS",
+                "Standard_GRS",
+                "Standard_ZRS",
+                "Premium_LRS",
+                "Standard_RAGRS"
+            ],
+            "metadata": {
+                "description": "Account type based on the storage redundancy requirements."
+            }
+        },
+        "vNetName": {
+            "type": "string",
+            "defaultValue": "myARMDemo",
+            "metadata": {
+                "description": "Unique name of the virtual network for this deployment"
+            }
+        }
+    },
+    "variables": {
+        "vNetPrefix": "10.0.0.0/16",
+        "vNetSubnet1Name": "[concat(resourceGroup().Location, '-', parameters('vNetName'), '-', 'Subnet')]",
+        "vNetSubnet1Prefix": "10.0.0.0/24",
+        "vNetSubnet1ID": "[concat(resourceId('Microsoft.Network/virtualNetworks',parameters('vNetName')),'/subnets/',variables('vNetSubnet1Name'))]",
+        "dnsServerPrivateIp": "10.0.0.8"
+    },
+    "resources": [
+        {
+            "name": "[parameters('storageAccountName')]",
+            "type": "Microsoft.Storage/storageAccounts",
+            "location": "[ResourceGroup().Location]",
+            "apiVersion": "2015-05-01-preview",
+            "properties": {
+                "accountType": "[parameters('storageAccountType')]"
+            }
+        },
+        {
+            "name": "[parameters('vNetName')]",
+            "type": "Microsoft.Network/virtualNetworks",
+            "location": "[ResourceGroup().Location]",
+            "apiVersion": "2015-05-01-preview",
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "[variables('vNetPrefix')]"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "[variables('vNetSubnet1Name')]",
+                        "properties": {
+                            "addressPrefix": "[variables('vNetSubnet1Prefix')]"
+                        }
+                    }
+                ]
+            }
+        }        
+    ]
+}
