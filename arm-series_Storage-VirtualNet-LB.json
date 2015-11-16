@@ -1,0 +1,163 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "storageAccountName": {
+            "type": "string",
+            "metadata": {
+                "description": "Unique name for the storage account."
+            }
+        },
+        "storageAccountType": {
+            "type": "string",
+            "defaultValue": "Standard_LRS",
+            "allowedValues": [
+                "Standard_LRS",
+                "Standard_GRS",
+                "Standard_ZRS",
+                "Premium_LRS",
+                "Standard_RAGRS"
+            ],
+            "metadata": {
+                "description": "Account type based on the storage redundancy requirements."
+            }
+        },
+        "vNetName": {
+            "type": "string",
+            "metadata": {
+                "description": "Name for the virtual network."
+            }
+        },
+        "DnsName": {
+            "type": "string",
+            "metadata": {
+                "description": "Unique public DNS prefix for the deployment. The fqdn will look something like '<dnsname>.westus.cloudapp.azure.com'."
+            }
+        },
+        "environmentType": {
+            "type": "string",
+            "allowedValues": [
+                "Development",
+                "Test",
+                "Production"
+            ],
+            "defaultValue": "Development",
+            "metadata": {
+                "description": "Type of environment where this deployment should occur. This has an impact on the number of VMs to be depoloyed."
+            }
+        }
+    },
+    "variables": {
+        "vNetPrefix": "10.0.0.0/16",
+        "vNetSubnet1Name": "[concat(resourceGroup().Location, '-', parameters('vNetName'), '-', 'Subnet')]",
+        "vNetSubnet1Prefix": "10.0.0.0/24",
+        "vNetSubnet1ID": "[concat(resourceId('Microsoft.Network/virtualNetworks',parameters('vNetName')),'/subnets/',variables('vNetSubnet1Name'))]",
+        "dnsServerPrivateIp": "10.0.0.8",
+        "lbFrontend": "lbFrontEnd",
+        "lbBackendAddrPool": "lbBackEndPool",
+        "deploymentSize": {
+            "Development": {
+                "instancesCount": 1
+            },
+            "Test": {
+                "instancesCount": 2
+            },
+            "Production": {
+                "instancesCount": 3
+            }
+        },
+        "selectedDeployment": "[variables('deploymentSize')[parameters('environmentType')]]"
+    },
+    "resources": [
+        {
+            "name": "[parameters('storageAccountName')]",
+            "type": "Microsoft.Storage/storageAccounts",
+            "location": "[ResourceGroup().Location]",
+            "apiVersion": "2015-05-01-preview",
+            "properties": {
+                "accountType": "[parameters('storageAccountType')]"
+            }
+        },
+        {
+            "name": "[parameters('vNetName')]",
+            "type": "Microsoft.Network/virtualNetworks",
+            "location": "[ResourceGroup().Location]",
+            "apiVersion": "2015-05-01-preview",
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "[variables('vNetPrefix')]"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "[variables('vNetSubnet1Name')]",
+                        "properties": {
+                            "addressPrefix": "[variables('vNetSubnet1Prefix')]"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "apiVersion": "2015-05-01-preview",
+            "type": "Microsoft.Network/publicIPAddresses",
+            "name": "publicIp",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "publicIPAllocationMethod": "Dynamic",
+                "dnsSettings": {
+                    "domainNameLabel": "[parameters('DnsName')]"
+                }
+            }
+        },
+        {
+            "apiVersion": "2015-05-01-preview",
+            "name": "loadBalancer",
+            "type": "Microsoft.Network/loadBalancers",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "Microsoft.Network/publicIPAddresses/publicIp"
+            ],
+            "properties": {
+                "frontendIPConfigurations": [
+                    {
+                        "name": "[variables('lbFrontend')]",
+                        "properties": {
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses','publicIp')]"
+                            }
+                        }
+                    }
+                ],
+                "backendAddressPools": [
+                    {
+                        "name": "[variables('lbBackendAddrPool')]"
+                    }
+                ]
+            }
+        },
+        {
+            "apiVersion": "2015-06-15",
+            "type": "Microsoft.Network/loadBalancers/inboundNatRules",
+            "name": "[concat('/loadbalancer/','VM-', copyIndex(),'-RDP')]",
+            "location": "[resourceGroup().location]",
+            "copy": {
+                "name": "lbRdpNatLoop",
+                "count": "[variables('selectedDeployment').instancesCount]"
+            },
+            "dependsOn": [
+                "[concat('Microsoft.Network/loadBalancers/loadBalancer')]"
+            ],
+            "properties": {
+                "frontendIPConfiguration": {
+                    "id": "[variables('lbFrontend')]"
+                },
+                "protocol": "tcp",
+                "frontendPort": "[add(3389, copyIndex())]",
+                "backendPort": 3389,
+                "enableFloatingIP": false
+            }
+        }
+    ]
+}
