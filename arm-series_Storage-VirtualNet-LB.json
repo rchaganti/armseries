@@ -140,12 +140,12 @@
         {
             "apiVersion": "2015-06-15",
             "type": "Microsoft.Network/loadBalancers/inboundNatRules",
-            "name": "[concat('/loadbalancer/','VM-', copyIndex(),'-RDP')]",
-            "location": "[resourceGroup().location]",
             "copy": {
                 "name": "lbRdpNatLoop",
                 "count": "[variables('selectedDeployment').instancesCount]"
             },
+            "name": "[concat('/loadbalancer/','VM-', copyIndex(1),'-RDP')]",
+            "location": "[resourceGroup().location]",
             "dependsOn": [
                 "[concat('Microsoft.Network/loadBalancers/loadBalancer')]"
             ],
@@ -154,7 +154,7 @@
                     "id": "[resourceId('Microsoft.Network/loadBalancers/frontendIPConfigurations','loadBalancer',variables('lbFrontend'))]"
                 },
                 "protocol": "tcp",
-                "frontendPort": "[add(3389, copyIndex())]",
+                "frontendPort": "[add(3389, copyIndex(1))]",
                 "backendPort": 3389,
                 "enableFloatingIP": false
             }
