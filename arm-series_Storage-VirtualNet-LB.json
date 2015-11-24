@@ -147,7 +147,7 @@
             "name": "[concat('/loadbalancer/','VM-', copyIndex(1),'-RDP')]",
             "location": "[resourceGroup().location]",
             "dependsOn": [
-                "[concat('Microsoft.Network/loadBalancers/loadBalancer')]"
+                "Microsoft.Network/loadBalancers/loadBalancer"
             ],
             "properties": {
                 "frontendIPConfiguration": {
