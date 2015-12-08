@@ -1,0 +1,330 @@
+    {
+        "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+        "contentVersion": "1.0.0.0",
+        "parameters": {
+            "storageAccountName": {
+                "type": "string",
+                "metadata": {
+                    "description": "Unique name for the storage account."
+                }
+            },
+            "storageAccountType": {
+                "type": "string",
+                "defaultValue": "Standard_LRS",
+                "allowedValues": [
+                    "Standard_LRS",
+                    "Standard_GRS",
+                    "Standard_ZRS",
+                    "Premium_LRS",
+                    "Standard_RAGRS"
+                ],
+                "metadata": {
+                    "description": "Account type based on the storage redundancy requirements."
+                }
+            },
+            "vNetName": {
+                "type": "string",
+                "metadata": {
+                    "description": "Name for the virtual network."
+                }
+            },
+            "DnsName": {
+                "type": "string",
+                "metadata": {
+                    "description": "Unique public DNS prefix for the deployment. The fqdn will look something like '<dnsname>.westus.cloudapp.azure.com'."
+                }
+            },
+            "environmentType": {
+                "type": "string",
+                "allowedValues": [
+                    "Development",
+                    "Test",
+                    "Production"
+                ],
+                "defaultValue": "Development",
+                "metadata": {
+                    "description": "Type of environment where this deployment should occur. This has an impact on the number of VMs to be depoloyed."
+                }
+            },
+            "dcVmName": {
+                "type": "string",
+                "metadata": {
+                    "description": "Domain Controller VM Name"
+                }
+            },
+            "assetLocation": {
+                "type": "string",
+                "defaultValue": "https://github.com/rchaganti/azure-quickstart-templates/raw/master/201-vm-domain-join",
+                "metadata": {
+                    "description": "The location of resources such as templates and DSC modules that the script is dependent"
+                }
+            },
+            "vmSize": {
+                "type": "string",
+                "defaultValue": "Standard_A2",
+                "metadata": {
+                    "description": "VM size for DC and other VMs."
+                }
+            },
+            "adminUserName": {
+                "type": "string",
+                "defaultValue": "admin",
+                "metadata": {
+                    "description": "administrator user name for the VMs."
+                }
+            },
+            "adminPassword": {
+                "type": "securestring",
+                "metadata": {
+                    "description": "administrator user password for the VMs."
+                }
+            },
+            "windowsOSVersion": {
+                "type": "string",
+                "defaultValue": "2012-R2-Datacenter",
+                "allowedValues": [
+                    "2008-R2-SP1",
+                    "2012-Datacenter",
+                    "2012-R2-Datacenter"
+                ],
+                "metadata": {
+                    "description": "Windows OS version for the VM, allowed values: 2008-R2-SP1, 2012-Datacenter, 2012-R2-Datacenter."
+                }
+            },
+            "adDomainName": {
+                "type": "string",
+                "defaultValue": "cloud.lab",
+                "metadata": {
+                    "description": "Domain name FQDN for the active directory."
+                }
+            }           
+        },
+        "variables": {
+            "vNetPrefix": "10.0.0.0/16",
+            "vNetSubnet1Name": "[concat(resourceGroup().Location, '-', parameters('vNetName'), '-', 'Subnet')]",
+            "vNetSubnet1Prefix": "10.0.0.0/24",
+            "vNetSubnet1ID": "[concat(resourceId('Microsoft.Network/virtualNetworks',parameters('vNetName')),'/subnets/',variables('vNetSubnet1Name'))]",
+            "dnsServerPrivateIp": "10.0.0.8",
+            "lbFrontend": "lbFrontEnd",
+            "lbBackendAddrPool": "lbBackEndPool",
+            "deploymentSize": {
+                "Development": {
+                    "instancesCount": 1
+                },
+                "Test": {
+                    "instancesCount": 2
+                },
+                "Production": {
+                    "instancesCount": 3
+                }
+            },
+            "selectedDeployment": "[variables('deploymentSize')[parameters('environmentType')]]",
+            "imagePublisher": "MicrosoftWindowsServer",
+            "imageOffer": "WindowsServer"            
+        },
+        "resources": [
+            {
+                "name": "[parameters('storageAccountName')]",
+                "type": "Microsoft.Storage/storageAccounts",
+                "location": "[ResourceGroup().Location]",
+                "apiVersion": "2015-05-01-preview",
+                "properties": {
+                    "accountType": "[parameters('storageAccountType')]"
+                }
+            },
+            {
+                "apiVersion": "2015-05-01-preview",
+                "type": "Microsoft.Network/networkInterfaces",
+                "name": "dcvmnif",
+                "location": "[resourceGroup().location]",
+                "properties": {
+                    "ipConfigurations": [
+                        {
+                            "name": "[concat(reference(parameters('vNetName')).subnets[0].name,parameters('dcVmName'),'-nifconfig')]",
+                            "properties": {
+                                "privateIPAllocationMethod": "Static",
+                                "privateIPAddress": "[variables('dnsServerPrivateIp')]",
+                                "subnet": {
+                                    "id": "[variables('vNetSubnet1ID')]"
+                                }
+                            }
+                        }
+                    ]
+                }
+            }, 
+            {
+                "name": "[parameters('vNetName')]",
+                "type": "Microsoft.Network/virtualNetworks",
+                "location": "[ResourceGroup().Location]",
+                "apiVersion": "2015-05-01-preview",
+                "properties": {
+                    "addressSpace": {
+                        "addressPrefixes": [
+                            "[variables('vNetPrefix')]"
+                        ]
+                    },
+                    "subnets": [
+                        {
+                            "name": "[variables('vNetSubnet1Name')]",
+                            "properties": {
+                                "addressPrefix": "[variables('vNetSubnet1Prefix')]"
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                "apiVersion": "2015-05-01-preview",
+                "type": "Microsoft.Network/publicIPAddresses",
+                "name": "publicIp",
+                "location": "[resourceGroup().location]",
+                "properties": {
+                    "publicIPAllocationMethod": "Dynamic",
+                    "dnsSettings": {
+                        "domainNameLabel": "[parameters('DnsName')]"
+                    }
+                }
+            },
+            {
+                "apiVersion": "2015-05-01-preview",
+                "name": "loadBalancer",
+                "type": "Microsoft.Network/loadBalancers",
+                "location": "[resourceGroup().location]",
+                "dependsOn": [
+                    "Microsoft.Network/publicIPAddresses/publicIp"
+                ],
+                "properties": {
+                    "frontendIPConfigurations": [
+                        {
+                            "name": "[variables('lbFrontend')]",
+                            "properties": {
+                                "publicIPAddress": {
+                                    "id": "[resourceId('Microsoft.Network/publicIPAddresses','publicIp')]"
+                                }
+                            }
+                        }
+                    ],
+                    "backendAddressPools": [
+                        {
+                            "name": "[variables('lbBackendAddrPool')]"
+                        }
+                    ]
+                }
+            },
+            {
+                "apiVersion": "2015-06-15",
+                "type": "Microsoft.Network/loadBalancers/inboundNatRules",
+                "copy": {
+                    "name": "lbRdpNatLoop",
+                    "count": "[variables('selectedDeployment').instancesCount]"
+                },
+                "name": "[concat('/loadbalancer/','VM-', copyIndex(1),'-RDP')]",
+                "location": "[resourceGroup().location]",
+                "dependsOn": [
+                    "Microsoft.Network/loadBalancers/loadBalancer"
+                ],
+                "properties": {
+                    "frontendIPConfiguration": {
+                        "id": "[resourceId('Microsoft.Network/loadBalancers/frontendIPConfigurations','loadBalancer',variables('lbFrontend'))]"
+                    },
+                    "protocol": "tcp",
+                    "frontendPort": "[add(3389, copyIndex(1))]",
+                    "backendPort": 3389,
+                    "enableFloatingIP": false
+                }
+            },
+            {
+                "apiVersion": "2015-06-15",
+                "type": "Microsoft.Compute/virtualMachines",
+                "name": "[Parameters('dcVMName')]",
+                "location": "[resourceGroup().location]",
+                "dependsOn": [
+                    "[resourceId('Microsoft.Storage/storageAccounts',parameters('storageAccountName'))]",
+                    "[resourceId('Microsoft.Network/networkInterfaces','dcvmnif')]"
+                ],
+                "properties": {
+                    "hardwareProfile": {
+                        "vmSize": "[parameters('vmSize')]"
+                    },
+                    "osProfile": {
+                        "computerName": "[parameters('dcVMName')]",
+                        "adminUsername": "[parameters('adminUsername')]",
+                        "adminPassword": "[parameters('adminPassword')]"
+                    },
+                    "storageProfile": {
+                        "imageReference": {
+                            "publisher": "[variables('imagePublisher')]",
+                            "offer": "[variables('imageOffer')]",
+                            "sku": "[parameters('windowsOSVersion')]",
+                            "version": "latest"
+                        },
+                        "osDisk": {
+                            "name": "[concat(parameters('dcVMName'), '-osdisk.vhd')]",
+                            "vhd": {
+                                "uri": "[concat('http://',parameters('storageAccountName'),'.blob.core.windows.net/vhds/', parameters('dcVMName'), '-osdisk.vhd')]"
+                            },
+                            "caching": "ReadWrite",
+                            "createOption": "FromImage"
+                        },
+                        "dataDisks": [
+                            {
+                                "name": "[concat(parameters('dcVMName'), '-data-disk1.vhd')]",
+                                "vhd": {
+                                    "uri": "[concat('http://',parameters('storageAccountName'),'.blob.core.windows.net/vhds/', parameters('dcVMName'), '-data-disk1.vhd')]"
+                                },
+                                "caching": "None",
+                                "createOption": "Empty",
+                                "diskSizeGB": "1000",
+                                "lun": 0
+                            }
+                        ]
+                    },
+                    "networkProfile": {
+                        "networkInterfaces": [
+                            {
+                                "id": "[resourceId('Microsoft.Network/networkInterfaces','dcvmnif')]"
+                            }
+                        ]
+                    },
+                    "diagnosticsProfile": {
+                        "bootDiagnostics": {
+                            "enabled": "true",
+                            "storageUri": "[concat('http://',parameters('storageAccountName'),'.blob.core.windows.net')]"
+                        }
+                    }
+                },
+                "resources": [
+                    {
+                        "type": "extensions",
+                        "name": "createadforest",
+                        "apiVersion": "2015-05-01-preview",
+                        "location": "[resourceGroup().location]",
+                        "dependsOn": [
+                            "[concat('Microsoft.Compute/virtualMachines/',parameters('dcVMName'))]"
+                        ],
+                        "properties": {
+                            "publisher": "Microsoft.Powershell",
+                            "type": "DSC",
+                            "typeHandlerVersion": "2.8",
+                            "settings": {
+                                "ModulesUrl": "[concat(parameters('assetLocation'),'/Configuration.zip')]",
+                                "ConfigurationFunction": "CreateADPDC.ps1\\CreateADPDC",
+                                "Properties": {
+                                    "DomainName": "[parameters('adDomainName')]",
+                                    "AdminCreds": {
+                                        "UserName": "[parameters('adminUsername')]",
+                                        "Password": "PrivateSettingsRef:AdminPassword"
+                                    }
+                                }
+                            },
+                            "protectedSettings": {
+                                "Items": {
+                                    "AdminPassword": "[parameters('adminPassword')]"
+                                }
+                            }
+                        }
+                    }
+                ]
+            }
+        ]
+    }
