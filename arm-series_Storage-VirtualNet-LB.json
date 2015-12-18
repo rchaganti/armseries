@@ -151,7 +151,7 @@
             ],
             "properties": {
                 "frontendIPConfiguration": {
-                    "id": "[resourceId('Microsoft.Network/loadBalancers/frontendIPConfigurations','loadBalancer',variables('lbFrontend'))]"
+                    "id": "[concat(resourceId('Microsoft.Network/loadBalancers','loadBalancer'),concat('/frontendIPConfigurations/',variables('lbFrontend')))]"
                 },
                 "protocol": "tcp",
                 "frontendPort": "[add(3389, copyIndex(1))]",
