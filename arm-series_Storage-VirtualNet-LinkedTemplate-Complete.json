@@ -473,6 +473,7 @@
                 "typeHandlerVersion": "2.8",
                 "settings": {
                     "ModulesUrl": "[concat(parameters('assetLocation'),'/Configuration.zip')]",
+                    "WmfVersion":  "4.0",
                     "ConfigurationFunction": "Configuration.ps1\\DomainJoin",
                     "Properties": {
                         "DomainName": "[parameters('adDomainName')]",
