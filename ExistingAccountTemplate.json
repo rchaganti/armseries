@@ -1,0 +1,35 @@
+{
+  "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0",
+  "parameters": {
+    "accountName": {
+      "type": "string"
+    },
+    "accountLocation": {
+      "type": "string"
+    },
+    "ModuleName": {
+      "type": "string"
+    },
+    "ModuleUri": {
+      "type": "string"
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "name": "[concat(parameters('accountName'), '/', parameters('ModuleName'))]",
+      "type": "Microsoft.Automation/automationAccounts/modules",
+      "apiVersion": "2015-10-31",
+      "location": "[parameters('accountLocation')]",
+      "dependsOn": [],
+      "tags": {},
+      "properties": {
+        "contentLink": {
+          "uri": "[parameters('ModuleUri')]"
+        }
+      }
+    }
+  ],
+  "outputs": {}
+}
