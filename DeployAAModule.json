@@ -1,0 +1,72 @@
+{
+  "$schema": "http://schemas.microsoft.org/azure/deploymentTemplate?api-version=2015-01-01#",
+  "contentVersion": "1.0",
+  "parameters": {
+    "New or existing Automation account": {
+      "type": "string",
+      "allowedValues": [
+        "New",
+        "Existing"
+      ],
+      "metadata": {
+        "description": "Select whether you want to create a new Automation account or use an existing account. WARNING: if you select NEW but use an Automation account name that already exists in your subscription, you will not be notified that your account is being updated. The pricing tier for the account will be set to free and any tags on the account will be erased."
+      }
+    },
+    "Automation Account Name": {
+      "type": "string",
+      "metadata": {
+        "description": "The module will be imported to this Automation account. If you want to import your module to an existing account, make sure the resource group matches and you have entered the correct name. The account name must be between 6 to 50 characters, and can contain only letters, numbers, and hyphens."
+      }
+    },
+    "Automation Account Location": {
+      "type": "string",
+      "metadata": {
+        "description": "The location to deploy the Automation account in. If you select an existing account, the location field will not be used."
+      }
+    },
+    "ModuleName" : {
+      "type" : "String",
+      "metadata" : {
+        "description" : "Name of the module being imported into the Azure Automation account."
+      }
+    },
+    "ModuleUri" : {
+      "type" : "string",
+      "metadata" : {
+          "description" : "URI for the AA module zip archive. This must be accessible from automation account."
+      }
+    }
+  },
+  "variables": {
+    "templatelink": "[concat('https://raw.githubusercontent.com/rchaganti/armseries/master/', parameters('New or Existing Automation account'), 'AccountTemplate.json')]"
+  },
+  "resources": [
+    {
+      "apiVersion": "2015-01-01",
+      "name": "nestedTemplate",
+      "type": "Microsoft.Resources/deployments",
+      "properties": {
+        "mode": "incremental",
+        "templateLink": {
+          "uri": "[variables('templatelink')]",
+          "contentVersion": "1.0"
+        },
+        "parameters": {
+          "accountName": {
+            "value": "[parameters('Automation Account Name')]"
+          },
+          "accountLocation": {
+            "value": "[parameters('Automation Account Location')]"
+          },
+          "ModuleName": {
+            "value": "[parameters('ModuleName')]"
+          },
+          "ModuleUri": {
+            "value": "[parameters('ModuleUri')]"
+          }
+        }
+      }
+    }
+  ],
+  "outputs": {}
+}
